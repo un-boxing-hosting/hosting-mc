@@ -85,9 +85,41 @@ server.backend = function(base_dir, socket_emitter, user_config) {
 
   (function() {
     var procfs = require('procfs-stats');
+    const { check } = require('diskusage');
+
+    var HOST_DU_HEARTBEAT_DELAY_MS = 10000;  // statvfs might be heavy, every 10s should be reasonable
     var HOST_HEARTBEAT_DELAY_MS = 1000;
 
+    /**
+     * Obtains the disk utilisation for a given mount point using statvfs
+     * 
+     * @param {string} path The disk mount point to monitor for free space
+     */
+    async function getFreeSpace(path) {
+
+      try {
+        const info = await check(path);
+        self.front_end.emit('host_diskspace', { 
+          'availdisk': info.available,
+          'freedisk': info.free, 
+          'totaldisk': info.total
+        });
+      } catch (err) {
+        logging.error('Failure in server.js:getFreeSpace() ' + err);
+      }
+    }
+
+    /**
+     * A callback function fired by setInterval (below)
+     * in turn calls Promise getFreeSpace()
+     */
+    async function host_diskspace() {
+
+      await getFreeSpace('/');
+    }    
+
     function host_heartbeat() {
+
       async.waterfall([
         async.apply(procfs.meminfo)
       ], function(err, meminfo) {
@@ -99,7 +131,9 @@ server.backend = function(base_dir, socket_emitter, user_config) {
       })
     }
 
+    setInterval(host_diskspace, HOST_DU_HEARTBEAT_DELAY_MS);
     setInterval(host_heartbeat, HOST_HEARTBEAT_DELAY_MS);
+    
   })();
 
   (function() {
@@ -397,7 +431,7 @@ server.backend = function(base_dir, socket_emitter, user_config) {
                       cb();
                       break;
                     case '.zip':
-                      var unzip = require('unzip');
+                      var unzip = require('unzipper');
                       fs.createReadStream(dest_filepath)
                         .pipe(unzip.Extract({ path: profile_dir })
                                 .on('close', function() { cb() })
@@ -427,6 +461,7 @@ server.backend = function(base_dir, socket_emitter, user_config) {
                       cb();
                   } catch (e) {
                     logging.error('simultaneous download race condition means postdownload hook may not have executed. redownload the profile to ensure proper operation.');
+	            logging.error('exception in postdownload server.js try/catch {0}'.format(e));
                     cb();
                   }
                 }
@@ -1304,7 +1339,8 @@ function server_container(server_name, user_config, socket_io) {
             'eula': async.apply(instance.property, 'eula'),
             'base_dir': function(cb) {
               cb(null, user_config.base_directory)
-            }
+            },
+            'java_version_in_use': async.apply(instance.property, 'java_version_in_use'),
           }, function(err, results) {
             if (err instanceof Object)
               logging.error('[{0}] Error with get_page_data glance'.format(server_name), err, results);
