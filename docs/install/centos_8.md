@@ -12,7 +12,7 @@ As written, these steps will install the webui with the following properties:
 
 # Installation steps
 
-The following steps much be executed as `root`.
+The following steps must be executed as `root`.
 
 ## DEPENDENCIES
 
@@ -81,7 +81,7 @@ Then, to manage the service:
 
 ### SUPERVISORD
 ```
-# apt install -y supervisord
+# yum install -y supervisord
 # cp /usr/games/minecraft/init/supervisor_conf /etc/supervisor/conf.d/mineos.conf
 # supervisorctl reload
 ```
