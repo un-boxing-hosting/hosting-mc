@@ -1534,6 +1534,9 @@ mineos.mc = function(server_name, base_dir) {
           callback(err, server_files);
         })
         break;
+      case 'java_versions':
+        java.getJavaVersionsAvailable(callback);
+        break;
       case 'autosave':
         var TIMEOUT_LENGTH = 2000;
         var tail = require('tail').Tail;
